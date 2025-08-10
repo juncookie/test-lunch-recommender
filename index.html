@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>점심 메뉴 추천</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f9fafb;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #ff6b6b;
+            padding: 20px;
+            color: white;
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+        }
+        #result {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #333;
+        }
+        button {
+            background-color: #4cafef;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #3498db;
+        }
+        #map {
+            width: 100%;
+            height: 500px;
+            margin-top: 20px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+        }
+    </style>
+    <!-- 카카오 지도 API (JavaScript 키 입력) -->
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=44c6a5940878182f11e8a1a52bd5eeed&libraries=services"></script>
+</head>
+<body>
+    <header>🍜 점심 메뉴 추천</header>
+    <div class="container">
+        <button onclick="recommendMenu()">오늘 메뉴 추천받기</button>
+        <div id="result">버튼을 눌러 메뉴를 추천받아보세요!</div>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        const menus = ["하루덮밥", "모밀엔카츠", "백운면", "백개장", "롯데리아", "봄", "수유리"];
+        let map, ps, markers = [];
+        let currentPosition = { lat: 37.580282, lng: 127.088470 }; // 사가정역 기본 좌표
+
+        // 지도 초기화
+        function initMap(lat, lng) {
+            map = new kakao.maps.Map(document.getElementById("map"), {
+                center: new kakao.maps.LatLng(lat, lng),
+                level: 4
+            });
+
+            // 지도에 컨트롤 추가 (확대/축소 + 지도/스카이뷰)
+            const zoomControl = new kakao.maps.ZoomControl();
+            map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+
+            const mapTypeControl = new kakao.maps.MapTypeControl();
+            map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
+
+            ps = new kakao.maps.services.Places();
+        }
+
+        // 현재 위치 가져오기 (가능하면)
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function (pos) {
+                    currentPosition = {
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude
+                    };
+                    initMap(currentPosition.lat, currentPosition.lng);
+                }, function () {
+                    initMap(currentPosition.lat, currentPosition.lng);
+                });
+            } else {
+                initMap(currentPosition.lat, currentPosition.lng);
+            }
+        }
+
+        // 메뉴 추천 및 검색
+        function recommendMenu() {
+            const choice = menus[Math.floor(Math.random() * menus.length)];
+            document.getElementById("result").innerHTML = `오늘은 <span style="color:#ff6b6b;">${choice}</span> 어때요? 🍽`;
+            searchPlaces(choice);
+        }
+
+        // 장소 검색
+        function searchPlaces(keyword) {
+            const searchOption = {
+                location: new kakao.maps.LatLng(currentPosition.lat, currentPosition.lng),
+                radius: 1000
+            };
+            ps.keywordSearch(keyword, placesSearchCB, searchOption);
+        }
+
+        // 검색 결과 표시
+        function placesSearchCB(data, status) {
+            if (status === kakao.maps.services.Status.OK) {
+                // 기존 마커 제거
+                markers.forEach(marker => marker.setMap(null));
+                markers = [];
+
+                const bounds = new kakao.maps.LatLngBounds();
+
+                data.forEach(place => {
+                    displayMarker(place);
+                    bounds.extend(new kakao.maps.LatLng(place.y, place.x));
+                });
+
+                // 지도 범위를 검색 결과에 맞게 조정
+                map.setBounds(bounds);
+            } else {
+                document.getElementById("result").innerHTML = "검색 결과가 없습니다 😢";
+            }
+        }
+
+        // 마커 + 인포윈도우
+        function displayMarker(place) {
+            const marker = new kakao.maps.Marker({
+                map: map,
+                position: new kakao.maps.LatLng(place.y, place.x)
+            });
+
+            const content = `
+                <div style="padding:5px;font-size:13px;">
+                    <strong>${place.place_name}</strong><br>
+                    <span>${place.address_name}</span><br>
+                    <a href="${place.place_url}" target="_blank" style="color:#4cafef;">상세보기</a>
+                </div>
+            `;
+
+            const infowindow = new kakao.maps.InfoWindow({ content: content });
+
+            kakao.maps.event.addListener(marker, 'click', function() {
+                infowindow.open(map, marker);
+            });
+
+            markers.push(marker);
+        }
+
+        window.onload = getLocation;
+    </script>
+</body>
+</html>
